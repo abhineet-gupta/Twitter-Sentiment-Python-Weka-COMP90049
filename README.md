@@ -28,4 +28,19 @@ Assignment 2 - Sem 1, 2017
 ### Code
 
 - transformation of data into a format to be used in the ML system e.g. ARFF for Weka
+  - read tweets; lower case, remove non-alphabets
+  - remove stop words
+  - calc word freq
+  - calc gini idx
+  - select words where gini < x and freq > y
+  - sort on gini [asc]
+  - ======
+  - calc custom idx
+  - limit features
+  - generate .arff
+  - run in Weka
+    - NB
+    - DT
+    - KNN
+
 - Feature engineering OTHER than frequency of words for full marks e.g. bi-grams
