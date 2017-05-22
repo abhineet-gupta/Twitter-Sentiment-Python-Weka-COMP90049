@@ -7,8 +7,10 @@ Twitter Sentiment analysis
 import re
 import os
 
-FILE_PATH_SMALL = os.path.join(os.path.dirname(__file__), "../data/small-test.txt")
-FILE_PATH_TRAIN = os.path.join(os.path.dirname(__file__), "../data/orig/train-tweets.txt")
+FP_TRAIN_TWEETS_S = os.path.join(os.path.dirname(__file__), "../data/small-train-tweets.txt")
+FP_TRAIN_LABELS_S = os.path.join(os.path.dirname(__file__), "../data/small-train-labels.txt")
+
+FP_TRAIN_TWEETS = os.path.join(os.path.dirname(__file__), "../data/orig/train-tweets.txt")
 OUT_FILE_PATH = os.path.join(os.path.dirname(__file__), "../data/output/freq.csv")
 
 RE_CLEAN_TWEET = r'(@[A-Za-z0-9]+)|([^A-Za-z \t])|(\w+:\/\/\S+)'
@@ -24,9 +26,21 @@ def import_tweets(path):
     for line in tweet_file:
         temp = line.strip().split("\t")
         tweets[temp[0]] = ' '.join(re.sub(RE_CLEAN_TWEET, " ", temp[1]).split()).lower()
-    
+
     tweet_file.close()
     return tweets
+
+def import_labels(path):
+    '''
+    imports labels for each tweet ID
+    @return dict containing tweet ID and its label
+    '''
+    label_file = open(path)
+    labels = {}
+    for line in label_file:
+        temp = line.strip().split("\t")
+        labels[temp[0]] = temp[1]
+    return labels
 
 def calc_word_freq(tweets):
     '''
@@ -46,8 +60,12 @@ def calc_word_freq(tweets):
 def main():
     '''Main function'''
     # contains tweets in a dict with ID as key and tweet as value
-    tweets = import_tweets(FILE_PATH_SMALL)
+    tweets = import_tweets(FP_TRAIN_TWEETS_S)
     print("Tweets read and collected:", len(tweets))
+
+    # import labels in a dict with ID as key and label as value
+    labels = import_labels(FP_TRAIN_LABELS_S)
+    print("Labels read:", len(labels))
 
     # Calculate word frequencies for all words
     words_freq = calc_word_freq(tweets)
