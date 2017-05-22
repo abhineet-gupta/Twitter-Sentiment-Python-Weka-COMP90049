@@ -11,7 +11,7 @@ FILE_PATH_SMALL = os.path.join(os.path.dirname(__file__), "../data/small-test.tx
 FILE_PATH_TRAIN = os.path.join(os.path.dirname(__file__), "../data/orig/train-tweets.txt")
 OUT_FILE_PATH = os.path.join(os.path.dirname(__file__), "../data/output/freq.csv")
 
-RE_CLEAN_TWEET = r'(@[A-Za-z0-9]+)|([^0-9A-Za-z \t])|(\w+:\/\/\S+)'
+RE_CLEAN_TWEET = r'(@[A-Za-z0-9]+)|([^A-Za-z \t])|(\w+:\/\/\S+)'
 
 def import_tweets(path):
     '''
@@ -46,17 +46,22 @@ def calc_word_freq(tweets):
 def main():
     '''Main function'''
     # contains tweets in a dict with ID as key and tweet as value
-    tweets = import_tweets(FILE_PATH_TRAIN)
+    tweets = import_tweets(FILE_PATH_SMALL)
     print("Tweets read and collected:", len(tweets))
 
     # Calculate word frequencies for all words
     words_freq = calc_word_freq(tweets)
     print(len(words_freq), "words counted")
 
+    # sort word_freqs
+    sorted_wf_list = [(k, words_freq[k]) for k in sorted(
+        words_freq, key=words_freq.get, reverse=True)]
+
     # Write out results to CSV
     csv_out = open(OUT_FILE_PATH, 'w')
-    for key in words_freq:
-        csv_out.write(key + "," + str(words_freq[key]) + "\n")
+    csv_out.write("tweet_ID" + "," + "freq" + "\n")
+    for word, freq in sorted_wf_list:
+        csv_out.write(word + "," + str(freq) + "\n")
     csv_out.close()
 
 if __name__ == '__main__':
