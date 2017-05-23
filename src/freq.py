@@ -8,9 +8,9 @@ import re
 import os
 
 STOP_WORD_LEN = 3
-GINI_CUTOFF = 0.55
-FEATURE_SIZE = 100
-FREQ_CUTOFF = 30
+GINI_CUTOFF = 0.59
+FEATURE_SIZE = 500
+FREQ_CUTOFF = 20
 
 PREPEND_FP = os.path.dirname(__file__)
 
@@ -24,6 +24,9 @@ FP_DEV_LABELS = os.path.join(PREPEND_FP, "../data/orig/dev-labels.txt")
 FP_TEST_TWEETS = os.path.join(PREPEND_FP, "../data/orig/test-tweets.txt")
 
 OUT_FILE_PATH = os.path.join(PREPEND_FP, "../data/output/freq.csv")
+FP_OUT_TRAIN1_ARFF = os.path.join(PREPEND_FP, "../data/output/train1.arff")
+FP_OUT_DEV1_ARFF = os.path.join(PREPEND_FP, "../data/output/dev1.arff")
+FP_OUT_TEST1_ARFF = os.path.join(PREPEND_FP, "../data/output/test1.arff")
 
 RE_CLEAN_TWEET = r'(@[A-Za-z0-9]+)|([^A-Za-z \t])|(\w+:\/\/\S+)'
 
@@ -54,6 +57,7 @@ def import_labels(path):
     for line in label_file:
         temp = line.strip().split("\t")
         labels[temp[0]] = temp[1]
+    label_file.close()
     return labels
 
 def calc_word_freq(tweets, labels):
@@ -70,16 +74,16 @@ def calc_word_freq(tweets, labels):
             if word in _words_freq:
                 if labels[tid] == 'positive':
                     _words_freq[word][0] += 1
-                elif labels[tid] == 'neutral':
+                elif labels[tid] == 'negative':
                     _words_freq[word][1] += 1
-                else:   # negative
+                else:   # neutral
                     _words_freq[word][2] += 1
             else:
                 if labels[tid] == 'positive':
                     _words_freq[word] = [1, 0, 0]
-                elif labels[tid] == 'neutral':
+                elif labels[tid] == 'negative':
                     _words_freq[word] = [0, 1, 0]
-                else: # negative
+                else: # neutral
                     _words_freq[word] = [0, 0, 1]
     return _words_freq
 
@@ -137,18 +141,72 @@ def filter_gini_freq(words_gini, words_freq_sum, gini_cutoff, freq_cutoff):
 
     return results
 
+def calc_custom_idx(words_freq, words_gini_filtered):
+    '''
+    calculates product of freq * 1/gini for each word
+    @param word freq dict and word gini dict
+    @return word custom idx dict
+    '''
+    result = {}
+    for word in words_gini_filtered:
+        result[word] = words_freq[word] * 1/words_gini_filtered[word]
+    return result
+
+def sort_dict_on_values(dic, desc=False):
+    '''
+    sorts a dictionary on its values
+    @param: dic dictionary {key: value}
+    @param: desc True if sorting descending
+    @return: a list of (key,value) tuples sorted by value
+    '''
+    return [(k, dic[k]) for k in sorted(dic, key=dic.get, reverse=desc)]
+
+def gen_arff(feature_list, instances, labels, out_file_path):
+    '''
+    generates .arff file for use with Weka
+    @param: list of features
+    @param: instances those features will either contain or not; dict {id: tweet word list}
+    @param: labels for each instance
+    @param: file path for .arff file
+    '''
+    f_contents = ""
+    f_contents += "@RELATION twitter-sent-top20\n"
+    for feature in feature_list:
+        f_contents += "@ATTRIBUTE " + feature + " NUMERIC\n"
+    f_contents += "@ATTRIBUTE sentiment {positive,negative,neutral}\n"
+    f_contents += "@DATA\n"
+
+    for instance in instances:
+        temp_tweet = instances[instance].split(" ")
+        # f_contents += instance + ","
+        for feature in feature_list:
+            if feature in temp_tweet:
+                f_contents += str(temp_tweet.count(feature)) + ","
+            else:
+                f_contents += "0,"
+        f_contents += labels[instance]
+        f_contents += "\n"
+    arff = open(out_file_path, 'w')
+    arff.write(f_contents)
+    arff.close()
+
 def main():
     '''Main function'''
     # contains tweets in a dict with ID as key and tweet as value
-    tweets = import_tweets(FP_TRAIN_TWEETS)
-    print("Tweets read and collected:", len(tweets))
+    tweets_train = import_tweets(FP_TRAIN_TWEETS)
+    tweets_dev = import_tweets(FP_DEV_TWEETS)
+    print("Tweets from training read and collected:", len(tweets_train))
+    print("Tweets from dev read and collected:", len(tweets_dev))
 
     # import labels in a dict with ID as key and label as value
-    labels = import_labels(FP_TRAIN_LABELS)
-    print("Labels read:", len(labels))
+    # labels = import_labels(FP_TRAIN_LABELS)
+    labels_train = import_labels(FP_TRAIN_LABELS)
+    labels_dev = import_labels(FP_DEV_LABELS)
+    print("Labels from train read:", len(labels_train))
+    print("Labels from dev read:", len(labels_dev))
 
     # Calculate word frequencies for all words
-    raw_words_freq = calc_word_freq(tweets, labels)
+    raw_words_freq = calc_word_freq(tweets_train, labels_train)
     print(len(raw_words_freq), "words counted")
 
     # remove stop words
@@ -164,28 +222,35 @@ def main():
     # Filter words based on freq sum and gini
     words_gini_filtered = filter_gini_freq(words_gini, words_freq_sum, GINI_CUTOFF, FREQ_CUTOFF)
 
-    # # sort based on word_freqs
-    # sorted_wf_sum_list = [(k, words_freq_sum[k]) for k in sorted(
-    #     words_freq_sum, key=words_freq_sum.get, reverse=True)]
+    # calc custom IDX
+    words_custom_idx = calc_custom_idx(words_freq_sum, words_gini_filtered)
 
-    # sort based on gini
-    sorted_w_gini_list = [(k, words_gini_filtered[k]) for k in sorted(
-        words_gini_filtered, key=words_gini_filtered.get, reverse=False)]
+    # sort based on custom idx
+    sorted_w_custom_list = sort_dict_on_values(words_custom_idx, True)
 
     # Write out results to CSV
     csv_out = open(OUT_FILE_PATH, 'w')
     csv_out.write("word" + "," + \
-        "freq_positive" + "," + "freq_neutral" + "," + "freq_negative" + \
-        "," + "total_freq" + "," + "gini_idx" + "\n")
+        "freq_positive" + "," + "freq_negative" + "," + "freq_neutral" + \
+        "," + "total_freq" + "," + "gini_idx" + "," + "custom_idx" + "\n")
 
-    for word, gini in sorted_w_gini_list:
+    for word, cidx in sorted_w_custom_list[:FEATURE_SIZE]:
         csv_out.write(word + "," + str(words_freq[word][0]) + \
             "," + str(words_freq[word][1]) + \
             "," + str(words_freq[word][2]) + \
             "," + str(words_freq_sum[word]) + \
-            "," + str(gini) + \
-            "\n")   # Calculate GINI index for each attribute
+            "," + str(words_gini[word]) + \
+            "," + str(cidx) + \
+            "\n")
     csv_out.close()
+
+    feat_list = []
+    for feature in sorted_w_custom_list[:FEATURE_SIZE]:
+        feat_list.append(feature[0])
+
+    # write out arff files
+    gen_arff(feat_list, tweets_train, labels_train, FP_OUT_TRAIN1_ARFF)
+    gen_arff(feat_list, tweets_dev, labels_dev, FP_OUT_DEV1_ARFF)
 
 if __name__ == '__main__':
     main()

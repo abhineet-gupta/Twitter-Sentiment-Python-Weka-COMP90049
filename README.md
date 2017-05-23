@@ -34,9 +34,9 @@ Assignment 2 - Sem 1, 2017
   - calc gini idx
   - select words where gini < x and freq > y
   - sort on gini [asc]
-  - ======
   - calc custom idx
   - limit features
+  - ======
   - generate .arff
   - run in Weka
     - NB
