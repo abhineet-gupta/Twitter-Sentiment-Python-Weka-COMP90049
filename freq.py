@@ -7,27 +7,28 @@ Twitter Sentiment analysis
 import re
 import os
 
-STOP_WORD_LEN = 2
-GINI_CUTOFF = 0.60
-FEATURE_SIZE = 600
-FREQ_CUTOFF = 10
+STOP_WORD_LEN = 3
 GINI_ZERO_REPLACE = 0.1
+
+GINI_CUTOFF = 0.50
+FREQ_CUTOFF = 20
+FEATURE_SIZE = 50
 
 PREPEND_FP = os.path.dirname(__file__)
 
-FP_TRAIN_TWEETS_S = os.path.join(PREPEND_FP, "../data/small-train-tweets.txt")
-FP_TRAIN_LABELS_S = os.path.join(PREPEND_FP, "../data/small-train-labels.txt")
+FP_TRAIN_TWEETS_S = os.path.join(PREPEND_FP, "data/small-train-tweets.txt")
+FP_TRAIN_LABELS_S = os.path.join(PREPEND_FP, "data/small-train-labels.txt")
 
-FP_TRAIN_TWEETS = os.path.join(PREPEND_FP, "../data/orig/train-tweets.txt")
-FP_TRAIN_LABELS = os.path.join(PREPEND_FP, "../data/orig/train-labels.txt")
-FP_DEV_TWEETS = os.path.join(PREPEND_FP, "../data/orig/dev-tweets.txt")
-FP_DEV_LABELS = os.path.join(PREPEND_FP, "../data/orig/dev-labels.txt")
-FP_TEST_TWEETS = os.path.join(PREPEND_FP, "../data/orig/test-tweets.txt")
+FP_TRAIN_TWEETS = os.path.join(PREPEND_FP, "data/orig/train-tweets.txt")
+FP_TRAIN_LABELS = os.path.join(PREPEND_FP, "data/orig/train-labels.txt")
+FP_DEV_TWEETS = os.path.join(PREPEND_FP, "data/orig/dev-tweets.txt")
+FP_DEV_LABELS = os.path.join(PREPEND_FP, "data/orig/dev-labels.txt")
+FP_TEST_TWEETS = os.path.join(PREPEND_FP, "data/orig/test-tweets.txt")
 
-OUT_FILE_PATH = os.path.join(PREPEND_FP, "../data/output/freq.csv")
-FP_OUT_TRAIN1_ARFF = os.path.join(PREPEND_FP, "../data/output/train-custom.arff")
-FP_OUT_DEV1_ARFF = os.path.join(PREPEND_FP, "../data/output/dev-custom.arff")
-FP_OUT_TEST1_ARFF = os.path.join(PREPEND_FP, "../data/output/test-custom.arff")
+OUT_FILE_PATH = os.path.join(PREPEND_FP, "data/freq.csv")
+FP_OUT_TRAIN1_ARFF = os.path.join(PREPEND_FP, "data/weka-input/train-custom.arff")
+FP_OUT_DEV1_ARFF = os.path.join(PREPEND_FP, "data/weka-input/dev-custom.arff")
+FP_OUT_TEST1_ARFF = os.path.join(PREPEND_FP, "data/weka-input/test-custom.arff")
 
 RE_CLEAN_TWEET = r'(@[A-Za-z0-9]+)|([^A-Za-z \t])|(\w+:\/\/\S+)'
 
@@ -165,6 +166,30 @@ def sort_dict_on_values(dic, desc=False):
     '''
     return [(k, dic[k]) for k in sorted(dic, key=dic.get, reverse=desc)]
 
+def gen_csv_features(s_list, words_freq, words_freq_sum, words_gini, file_path):
+    '''
+    generate a csv file containing selected features
+    @param: list of features sorted by some metric about them
+    @param: frequency of words in each class
+    @param: total freq of words
+    @param: gini index of words
+    @param: file path to output to
+    '''
+    csv_out = open(file_path, 'w')
+    csv_out.write("word" + "," + \
+        "freq_positive" + "," + "freq_negative" + "," + "freq_neutral" + \
+        "," + "total_freq" + "," + "gini_idx" + "," + "custom_idx" + "\n")
+
+    for word, cidx in s_list[:FEATURE_SIZE]:
+        csv_out.write(word + "," + str(words_freq[word][0]) + \
+            "," + str(words_freq[word][1]) + \
+            "," + str(words_freq[word][2]) + \
+            "," + str(words_freq_sum[word]) + \
+            "," + str(words_gini[word]) + \
+            "," + str(cidx) + \
+            "\n")
+    csv_out.close()
+
 def gen_arff(feature_list, instances, labels, out_file_path):
     '''
     generates .arff file for use with Weka
@@ -199,21 +224,26 @@ def main():
     # contains tweets in a dict with ID as key and tweet as value
     tweets_train = import_tweets(FP_TRAIN_TWEETS)
     tweets_dev = import_tweets(FP_DEV_TWEETS)
-    print("Tweets from training read and collected:", len(tweets_train))
-    print("Tweets from dev read and collected:", len(tweets_dev))
+    tweets_test = import_tweets(FP_TEST_TWEETS)
+    print("Tweets from training read:", len(tweets_train))
+    print("Tweets from dev read:", len(tweets_dev))
+    print("Tweets from test read:", len(tweets_test))
 
     # import labels in a dict with ID as key and label as value
-    # labels = import_labels(FP_TRAIN_LABELS)
     labels_train = import_labels(FP_TRAIN_LABELS)
     labels_dev = import_labels(FP_DEV_LABELS)
     print("Labels from train read:", len(labels_train))
     print("Labels from dev read:", len(labels_dev))
+    # label for test data is a question mark
+    labels_test = {}
+    for tweet_id in tweets_test:
+        labels_test[tweet_id] = "?"
 
     # Calculate word frequencies for all words
     raw_words_freq = calc_word_freq(tweets_train, labels_train)
     print(len(raw_words_freq), "words counted")
 
-    # remove stop words
+    # remove short words
     words_freq = remove_stop_words(raw_words_freq, STOP_WORD_LEN)
     print(str(len(raw_words_freq) - len(words_freq)), "stop words removed.")
 
@@ -229,24 +259,11 @@ def main():
     # calc custom IDX
     words_custom_idx = calc_custom_idx(words_freq_sum, words_gini_filtered)
 
-    # sort based on custom idx
+    # sort based on a metric
     sorted_w_custom_list = sort_dict_on_values(words_custom_idx, True)
 
     # Write out results to CSV
-    csv_out = open(OUT_FILE_PATH, 'w')
-    csv_out.write("word" + "," + \
-        "freq_positive" + "," + "freq_negative" + "," + "freq_neutral" + \
-        "," + "total_freq" + "," + "gini_idx" + "," + "custom_idx" + "\n")
-
-    for word, cidx in sorted_w_custom_list[:FEATURE_SIZE]:
-        csv_out.write(word + "," + str(words_freq[word][0]) + \
-            "," + str(words_freq[word][1]) + \
-            "," + str(words_freq[word][2]) + \
-            "," + str(words_freq_sum[word]) + \
-            "," + str(words_gini[word]) + \
-            "," + str(cidx) + \
-            "\n")
-    csv_out.close()
+    gen_csv_features(sorted_w_custom_list, words_freq, words_freq_sum, words_gini, OUT_FILE_PATH)
 
     feat_list = []
     for feature in sorted_w_custom_list[:FEATURE_SIZE]:
@@ -255,6 +272,7 @@ def main():
     # write out arff files
     gen_arff(feat_list, tweets_train, labels_train, FP_OUT_TRAIN1_ARFF)
     gen_arff(feat_list, tweets_dev, labels_dev, FP_OUT_DEV1_ARFF)
+    gen_arff(feat_list, tweets_test, labels_test, FP_OUT_TEST1_ARFF)
 
 if __name__ == '__main__':
     main()

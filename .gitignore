@@ -58,5 +58,10 @@ docs/_build/
 target/
 
 data/orig
-data/output
 
+
+data/freq\.csv
+
+data/weka-input/
+
+data/weka-output/

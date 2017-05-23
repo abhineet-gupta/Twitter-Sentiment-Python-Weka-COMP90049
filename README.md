@@ -36,11 +36,21 @@ Assignment 2 - Sem 1, 2017
   - sort on gini [asc]
   - calc custom idx
   - limit features
-  - ======
-  - generate .arff
+  - generate .arff for test data
   - run in Weka
     - NB
     - DT
     - KNN
 
 - Feature engineering OTHER than frequency of words for full marks e.g. bi-grams
+
+### Deliverables
+
+- MSE
+  - code
+  - Readme
+  - Output of test results
+
+- LMS
+  - report
+  - reviews
