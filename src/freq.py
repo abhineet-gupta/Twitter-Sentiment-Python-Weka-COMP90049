@@ -7,10 +7,11 @@ Twitter Sentiment analysis
 import re
 import os
 
-STOP_WORD_LEN = 3
-GINI_CUTOFF = 0.59
-FEATURE_SIZE = 500
-FREQ_CUTOFF = 20
+STOP_WORD_LEN = 2
+GINI_CUTOFF = 0.60
+FEATURE_SIZE = 600
+FREQ_CUTOFF = 10
+GINI_ZERO_REPLACE = 0.1
 
 PREPEND_FP = os.path.dirname(__file__)
 
@@ -24,9 +25,9 @@ FP_DEV_LABELS = os.path.join(PREPEND_FP, "../data/orig/dev-labels.txt")
 FP_TEST_TWEETS = os.path.join(PREPEND_FP, "../data/orig/test-tweets.txt")
 
 OUT_FILE_PATH = os.path.join(PREPEND_FP, "../data/output/freq.csv")
-FP_OUT_TRAIN1_ARFF = os.path.join(PREPEND_FP, "../data/output/train1.arff")
-FP_OUT_DEV1_ARFF = os.path.join(PREPEND_FP, "../data/output/dev1.arff")
-FP_OUT_TEST1_ARFF = os.path.join(PREPEND_FP, "../data/output/test1.arff")
+FP_OUT_TRAIN1_ARFF = os.path.join(PREPEND_FP, "../data/output/train-custom.arff")
+FP_OUT_DEV1_ARFF = os.path.join(PREPEND_FP, "../data/output/dev-custom.arff")
+FP_OUT_TEST1_ARFF = os.path.join(PREPEND_FP, "../data/output/test-custom.arff")
 
 RE_CLEAN_TWEET = r'(@[A-Za-z0-9]+)|([^A-Za-z \t])|(\w+:\/\/\S+)'
 
@@ -149,7 +150,10 @@ def calc_custom_idx(words_freq, words_gini_filtered):
     '''
     result = {}
     for word in words_gini_filtered:
-        result[word] = words_freq[word] * 1/words_gini_filtered[word]
+        temp_gini = words_gini_filtered[word]
+        if temp_gini == 0:
+            temp_gini = GINI_ZERO_REPLACE
+        result[word] = words_freq[word] * 1/temp_gini
     return result
 
 def sort_dict_on_values(dic, desc=False):
