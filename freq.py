@@ -8,10 +8,10 @@ import re
 import os
 
 STOP_WORD_LEN = 3
-GINI_ZERO_REPLACE = 0.1
+GINI_ZERO_REPLACE = 0.2
 
-GINI_CUTOFF = 0.50
-FREQ_CUTOFF = 20
+GINI_CUTOFF = 0.57
+FREQ_CUTOFF = 10
 FEATURE_SIZE = 50
 
 PREPEND_FP = os.path.dirname(__file__)
